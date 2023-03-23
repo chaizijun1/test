@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>俄罗斯方块</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+			background-color: #fff;
+			font-family: Arial, sans-serif;
+		}
+
+		#game {
+			border: 2px solid #000;
+			margin: 10px auto;
+			display: block;
+		}
+
+		#game canvas {
+			display: block;
+			margin: 0 auto;
+		}
+
+		#score {
+			text-align: center;
+			font-size: 24px;
+			margin-bottom: 10px;
+		}
+
+		#controls {
+			text-align: center;
+			margin-bottom: 10px;
+		}
+
+		button {
+			font-size: 16px;
+			padding: 5px 10px;
+			background-color: #ccc;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+			margin: 0 5px;
+		}
+
+		button:hover {
+			background-color: #aaa;
+			color: #fff;
+		}
+	</style>
+</head>
+<body>
+	<h1>俄罗斯方块</h1>
+	<div id="score">得分：0</div>
+	<div id="game">
+		<canvas id="canvas" width="200" height="400"></canvas>
+	</div>
+	<div id="controls">
+		<button id="start">开始</button>
+		<button id="pause">暂停</button>
+		<button id="restart">重新开始</button>
+	</div>
+
+	<script>
+		var canvas = document.getElementById("canvas");
+		var ctx = canvas.getContext("2d");
+
+		var ROWS = 20;
+		var COLS = 10;
+		var CELL_SIZE = 20;
+		var BOARD_WIDTH = COLS * CELL_SIZE;
+		var BOARD_HEIGHT = ROWS * CELL_SIZE;
+		var PIECES = [
+			{
+				color: "#f00",
+				shape: [
+					[1, 1, 1],
+					[0, 1, 0]
+				]
+			},
+			{
+				color: "#0f0",
+				shape: [
+					[0, 2, 2],
+					[2, 2, 0]
+				]
+			},
+			{
+				color: "#00f",
+				shape: [
+					[3, 3, 0],
+					 [0, 3, 3]
+				]
+			},
+			{
+				color: "#ff0",
+				shape: [
+					[4, 0, 0],
+					[4, 4, 4]
+				]
+			},
+			{
+				color: "#0ff",
+				shape: [
+					[0, 0, 5],
+					[5, 5, 5]
+				]
+			},
+			{
+				color: "#f0f",
+				shape: [
+					[6, 6],
+					[6, 6]
+				]
+			},
+			{
+				color: "#ff9",
+				shape: [
+					[7, 7, 7, 7]
+				]
+			}
+		];
+
+		var board = [];
+		var currentPiece = null;
+		var nextPiece = null;
+		var score = 0;
+		var intervalId = null;
+		var isPaused = false;
+
+		function init() {
+			for (var row = 0; row < ROWS; row++) {
+				board[row] = [];
+				for (var col = 0; col < COLS; col++) {
+					board[row][col] = 0;
+				}
+			}
+			newPiece();
+			draw();
+		}
+
+		function newPiece() {
+			var index = Math.floor(Math.random() * PIECES.length);
+			currentPiece = nextPiece || PIECES[index];
+			nextPiece = PIECES[Math.floor(Math.random() * PIECES.length)];
+			currentPiece.x = 3;
+			currentPiece.y = -2;
+			if (isColliding(currentPiece)) {
+				gameOver();
+			}
+		}
+
+		function draw() {
+			ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+			drawBoard();
+			drawPiece(currentPiece, "black");
+			drawNextPiece(nextPiece);
+			drawScore();
+		}
+
+				function drawBoard() {
+			for (var row = 0; row < ROWS; row++) {
+				for (var col = 0; col < COLS; col++) {
+					if (board[row][col] !== 0) {
+						ctx.fillStyle = PIECES[board[row][col] - 1].color;
+						ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+						ctx.strokeRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+					}
+				}
+			}
+		}
+
+		function drawPiece(piece, color) {
+			for (var row = 0; row < piece.shape.length; row++) {
+				for (var col = 0; col < piece.shape[row].length; col++) {
+					if (piece.shape[row][col] !== 0) {
+						ctx.fillStyle = color || piece.color;
+						ctx.fillRect((col + piece.x) * CELL_SIZE, (row + piece.y) * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+						ctx.strokeRect((col + piece.x) * CELL_SIZE, (row + piece.y) * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+					}
+				}
+			}
+		}
+
+		function drawNextPiece(piece) {
+			var canvasNext = document.createElement("canvas");
+			canvasNext.width = 80;
+			canvasNext.height = 80;
+			var ctxNext = canvasNext.getContext("2d");
+			ctxNext.clearRect(0, 0, canvasNext.width, canvasNext.height);
+			drawPiece(piece, "gray");
+			ctxNext.drawImage(canvas, 0, 0, canvasNext.width, canvasNext.height);
+			ctx.clearRect(BOARD_WIDTH + 1, 0, canvasNext.width, canvasNext.height);
+			ctx.drawImage(canvasNext, BOARD_WIDTH + 1, 0);
+		}
+		function drawScore() {
+			console.log("当前分数为：" + score);
+			ctx.fillStyle = "#000";
+			ctx.font = "24px Arial";
+			ctx.textAlign = "center";
+			ctx.fillText("得分：" + score, BOARD_WIDTH / 2, BOARD_HEIGHT + 30);
+		}
+
+		function movePiece(dx, dy) {
+			if (!isPaused && !isColliding({x: currentPiece.x + dx, y: currentPiece.y + dy, shape: currentPiece.shape})) {
+				currentPiece.x += dx;
+				currentPiece.y += dy;
+				draw();
+			}
+		}
+
+		function rotatePiece() {
+			if (!isPaused) {
+				var rotatedPiece = {
+					x: currentPiece.x,
+					y: currentPiece.y,
+					color: currentPiece.color,
+					shape: []
+				};
+				for (var row = 0; row < currentPiece.shape.length; row++) {
+					rotatedPiece.shape[row] = [];
+					for (var col = 0; col < currentPiece.shape[row].length; col++) {
+						rotatedPiece.shape[row][col] = currentPiece.shape[currentPiece.shape.length - col - 1][row];
+					}
+				}
+				if (!isColliding(rotatedPiece)) {
+					currentPiece = rotatedPiece;
+					draw();
+				}
+			}
+		}
+		function isColliding(piece) {
+			for (var row = 0; row < piece.shape.length; row++) {
+				for (var col = 0; col < piece.shape[row].length; col++) {
+					if (piece.shape[row][col] !== 0) {
+						var x = piece.x + col;
+						var y = piece.y + row;
+						if (y >= ROWS || x < 0 || x >= COLS || y < 0 || board[y][x] !== 0) {
+							return true;
+						}
+					}
+				}
+			}
+			return false;
+		}
+
+		function addPieceToBoard(piece) {
+		  for (var row = 0; row < piece.shape.length; row++) {
+			for (var col = 0; col < piece.shape[row].length; col++) {
+			  if (piece.shape[row][col] !== 0) {
+				var x = piece.x + col;
+				var y = piece.y + row;
+				console.log("将方块加入到游戏板中，坐标为：" + x + ", " + y);
+				board[y][x] = piece.shape[row][col];
+			  }
+			}
+		  }
+		}
+
+		function removeFullRows() {
+		  var rowsToRemove = [];
+		  for (var row = 0; row < ROWS; row++) {
+			var isFull = true;
+			for (var col = 0; col < COLS; col++) {
+			  if (board[row][col] === 0) {
+				isFull = false;
+				break;
+			  }
+			}
+			if (isFull) {
+			  rowsToRemove.unshift(row);
+			}
+		  }
+		  for (var i = 0; i < rowsToRemove.length; i++) {
+			board.splice(rowsToRemove[i], 1);
+			board.unshift(new Array(COLS).fill(0));
+			console.log("移除满行，当前分数为：" + score);
+			score += 10;
+		  }
+		}
+
+		function gameOver() {
+			clearInterval(intervalId);
+			alert("游戏结束！得分：" + score);
+			init();
+		}
+
+		function startGame() {
+			if (!intervalId) {
+				intervalId = setInterval(function() {
+					movePiece(0, 1);
+					if (isColliding(currentPiece)) {
+						addPieceToBoard(currentPiece);
+						removeFullRows();
+						newPiece();
+					}
+				}, 500);
+			}
+			isPaused = false;
+		}
+
+		function pauseGame() {
+			isPaused = true;
+		}
+
+		function restartGame() {
+			clearInterval(intervalId);
+			init();
+		}
+
+		init();
+
+		document.addEventListener("keydown", function(event) {
+			if (event.keyCode === 37) {
+				movePiece(-1, 0);
+			} else if (event.keyCode === 39) {
+				movePiece(1, 0);
+			} else if (event.keyCode === 40) {
+				movePiece(0, 1);
+			} else if (event.keyCode === 38) {
+				rotatePiece();
+			} else if (event.keyCode === 32) {
+				event.preventDefault();
+				startGame();
+			} else if (event.keyCode === 80) {
+				event.preventDefault();
+				pauseGame();
+			} else if (event.keyCode === 82) {
+				event.preventDefault();
+				restartGame();
+			}
+		});
+	</script>
+</body>
+</html>
